@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>西語發音酷學習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body {
+            background-color: #f3e7d0;
+            font-family: 'Arial', sans-serif, 'cursive', 'fantasy';
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center p-8">
+    <div class="w-full max-w-screen-lg">
+        <div class="flex items-center mb-8">
+            <img src='static\\image\\Sun.png' alt="Sun png image" width="200" height="200"/>
+            <span style="display: inline-block; text-align: center; width: 100%;">
+                <span style="display: inline-block; vertical-align: middle;font-size: 48px; font-family: LXGW WenKai TC; color: #89b026;">
+                    西語發音酷學習
+                </span>
+            </span>
+        </div>
+        <style>
+            .flex {
+                display: flex;
+            }
+            .justify-end {
+                justify-content: flex-end;
+            }
+            .items-center {
+                align-items: center;
+            }
+            .items-right{
+                align-items: end;
+            }
+            .mb-8 {
+                margin-bottom: 2rem; /* 8 * 0.25rem */
+            }
+            .text-2xl {
+                font-size: 1.5rem; /* or adjust as needed */
+            }
+            .text-gray-700 {
+                color: #4a5568; /* adjust the color as needed */
+            }
+            .mr-4 {
+                margin-right: 1rem; /* 4 * 0.25rem */
+            }
+            .w-30 {
+                width: 30px; /* adjust size as needed */
+            }
+            .h-30 {
+                height: 30px; /* adjust size as needed */
+            }
+            .lxgw-wenkai-tc-regular 
+            {
+                font-family: "LXGW WenKai TC", cursive;
+                font-weight: 400;
+                font-style: normal;
+            }
+
+        </style>
+        <!--<div class="flex justify-end items-center mb-8">
+            <div class="text-2xl text-gray-700 mr-4 lxgw-wenkai-tc-regular ">AI小助手</div>
+            <img src='static\\image\\kusohamu.png' alt="Cute assistant icon" class="w+30 h+30">
+        </div>-->         
+        <div class="flex flex-col lg:flex-row gap-8 mb-8">
+            <div class="bg-white p-4 rounded-lg shadow-md flex-1">
+                <div class="text-center mt-2 text-lg lxgw-wenkai-tc-regular">按下聲波開始錄音</div>
+                <form method="Post" action="/">
+                    <select name="speechFile" required>
+                        <option value="A.wav">A</option>
+                        <option value="B.wav">B</option>
+                        <option value="C.wav">C</option>
+                        <option value="D.wav">D</option>
+                        <option value="E.wav">E</option>
+                        <option value="F.wav">F</option>
+                    </select>
+                    <canvas id="waveform"></canvas>
+                    <style>
+                        #waveform {
+                            width: 100%;
+                            height: 150px;
+                            background-image: url(https://i.ibb.co/wcqcrKh/wave.jpg);
+                            background-position: center;
+                            background-size: cover;
+                            background-repeat: no-repeat;
+                            cursor: pointer;
+                        }
+                    </style>
+                    <button type="start" id="start" class="lxgw-wenkai-tc-regular">Start</button>
+                    {% if score is not none%}
+                    <h1 class="lxgw-wenkai-tc-regular">您的檢測分數為{{ score }}.</h1>
+                    {% endif %} 
+                </form>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md flex-1 flex flex-col items-center">
+                <div class="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg text-4xl">/a/</div>
+                {%if score > 40 %}
+                    {%if score < 60 %}
+                        <div class="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg text-4xl mt-4 text-xl text-red-600 lxgw-wenkai-tc-regular">請再說一次，或是靠近麥克風</div>
+                    {%elif score < 80 %}
+                        <div class="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg text-4xl mt-4 text-xl text-red-600 lxgw-wenkai-tc-regular">你可能要注意嘴型，或是再聽一次音檔</div>
+                    {%elif score < 100 %}
+                        <div class="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg text-4xl mt-4 text-xl text-red-600 lxgw-wenkai-tc-regular">非常完美</div>
+                    {%endif%}
+                {%endif%}
+                {%if score < 40%}
+                <div class="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg text-4xl mt-4 text-xl text-green-600 lxgw-wenkai-tc-regular">請依照字母發音</div>
+                {%endif%}
+            </div>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-md w-full mb-8">
+            <h2 align="center" class="text-2xl mb-4 lxgw-wenkai-tc-regular">"A"的發音</h2>
+            <iframe width="100%" height="315" src="https://www.youtube.com/watch?v=EHw_zm4la2Q" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+    <script src="/static/js/waveform.js"></script>
+    <script>
+        document.getElementById('startButton').addEventListener('click', toggleRecording);
+    </script>
+</body>
+</html>

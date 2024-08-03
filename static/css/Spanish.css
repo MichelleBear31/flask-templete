@@ -1,0 +1,267 @@
+body {
+    background-color: rgb(243, 239, 239);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+.navbar {
+    background-color: #D4CCC2;
+    overflow: hidden;
+}
+.navbar a {
+    float: left;
+    display: block;
+    color: #f2f2f2;
+    text-align: center;
+    padding: 14px 20px;
+    text-decoration: none;
+}
+.navbar a:hover {
+    background-color: #efe8e0;
+    color: #D4CCC2;
+}
+.navbar a.active {
+    background-color: #cabba9; 
+    color: white;
+}
+.content {
+    display: none;
+    padding: 20px;
+}
+.content.active {
+    display: block;
+}
+#home h1 {
+    color: #cabba9;
+    text-align: center; 
+}
+#home p {
+    color: #cabba9;
+    text-align: center;
+    display: block;
+}
+#feature-box-home-title {
+    /*display: none;*/ /* 首页默认隐藏 */
+    background-color: #ffffff; 
+    border-radius: 10px; 
+    padding: 20px; /* 内边距 */
+    margin-top: 5px; /* 顶部外边距 */
+    margin-left: 22%;
+    margin-right: 22%;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+#feature-box-home-container {
+    display: none; /* 初始化隐藏 */
+}
+#feature-box-home-container.flexbox {
+    display: flex; /* 使用flexbox布局 */
+    justify-content: space-between;
+    margin-left: 22%;
+    margin-right: 22%;
+    gap: 20px; /* 添加间隔 */
+}
+#feature-box-home-alphabetselect {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 5px;
+    margin-left: 22%;
+    margin-right: 22%;
+    margin-bottom: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+select {
+    display: flex;
+    width: 70px;
+    height: 50px;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #cabba9;
+    border-radius: 5px;
+    background-color: #ffffff;
+    color: #cabba9;
+    text-align: center;
+    margin: 0 auto;
+}
+#alphabetselect-start-button {
+    display: flex;
+    width: 70px;
+    font-size: 14px;
+    background-color: #cabba9; 
+    color: white; /* 设置文字颜色 */
+    border: none; /* 去掉按钮边框 */
+    padding: 10px 20px; /* 设置按钮内边距 */
+    border-radius: 5px; 
+    cursor: pointer; /* 设置光标样式为手型 */
+    margin: 0 auto; /*实现按钮居中*/
+}
+.hidden {
+    display: none;
+}
+#feature-box-home-example-audio {
+    background-color: #ffffff; 
+    border-radius: 10px; 
+    padding: 20px; 
+    flex: 1; 
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+}
+.image-button-example-audio {
+    background: url('/static/image/example-audio.png') no-repeat center center;
+    background-size: cover;
+    border: none;
+    width: 65px; 
+    height: 50px;
+    cursor: pointer;
+    display: block;
+    margin: 20px auto; 
+}
+#feature-box-home-record {
+    background-color: #ffffff; 
+    border-radius: 10px; 
+    padding: 20px; 
+    flex: 1; 
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+}
+.canvas-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#waveform {
+    width: 200px;
+    height: 50px;
+    background-image: url('/static/image/speech recognition-beige-image matting.png');
+    background-position: center;
+    background-size: contain;
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+#speech-recognition-button {
+    display: flex;
+    width: 100px;
+    font-size: 14px;
+    background-color: #cabba9; 
+    color: white; /* 设置文字颜色 */
+    border: none; /* 去掉按钮边框 */
+    padding: 10px 20px; /* 设置按钮内边距 */
+    border-radius: 5px; 
+    cursor: pointer; /* 设置光标样式为手型 */
+    margin: 0 auto; /*实现按钮居中*/
+}
+#feature-box-home-result {
+    display: none;/* 初始化隐藏 */
+}
+#feature-box-home-result.flexbox {
+    display: block;
+    height: 189px;
+    background-color: #ffffff;
+    border-radius: 10px; 
+    padding: 20px; 
+    margin-top: 20px;
+    margin-left: 22%;
+    margin-right: 22%;
+    margin-bottom: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+#result-text {
+    font-family: system-ui;
+    font-size: 80px; /* 修改字体大小 */
+    color: #cabba9; /* 修改字体颜色 */
+    text-align: center; /* 居中对齐 */
+    /* font-weight: bold;  */
+    margin-top: 40px; /* 增加顶部边距 */
+}
+#score-text {
+    font-family: system-ui;
+    font-size: 30px; /* 修改字体大小 */
+    color: #cabba9; /* 修改字体颜色 */
+    text-align: center; /* 居中对齐 */
+    margin-top: 40px; /* 增加顶部边距 */
+}
+#alphabet h1 {
+    color: #cabba9;
+    text-align: center;
+}
+#alphabet p {
+    color: #cabba9;
+    text-align: center;
+}
+#feature-box-alphabet {
+    background-color: #ffffff; 
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 5px;
+    margin-left: 22%;
+    margin-right: 22%;
+    margin-bottom: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+}
+#alphabet img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+}
+#videos h1 {
+    color: #cabba9;
+    text-align: center;
+}
+#videos p {
+    color: #cabba9;
+    text-align: center;
+}
+#feature-box-videos {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 20px; 
+    margin-top: 5px; 
+    margin-left: 22%;
+    margin-right: 22%;
+    margin-bottom: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+}
+.video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 比例 */
+    height: 0;
+    overflow: hidden;
+    max-width: 100%;
+}
+.video-container iframe, .video-container object, .video-container embed {
+    position: absolute;
+    left: 50%; /* 左侧偏移量50% */
+    transform: translateX(-50%); /* 水平居中 */
+}
+#contact h1 {
+    color: #cabba9;
+    text-align: center;
+}
+#contact p {
+    color: #cabba9;
+    text-align: center;
+}
+#feature-box-contact {
+    background-color: #ffffff; 
+    border-radius: 10px; 
+    padding: 20px; 
+    margin-top: 5px; 
+    margin-left: 22%;
+    margin-right: 22%;
+    margin-bottom: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+}
+@media screen and (max-width: 600px) {
+    .navbar a {
+        float: none;
+        display: block;
+        text-align: left;
+    }
+    .content {
+        padding: 15px;
+    }
+    #feature-box-videos {
+        width: 100%; /* 在小屏幕设备上使用100%宽度 */
+        height: auto; /* 自适应高度 */
+    }
+}

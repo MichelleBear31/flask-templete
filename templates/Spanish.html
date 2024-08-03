@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>西語字母發音學習</title>
+    <link rel="stylesheet" href="/static/css/Spanish.css">
+    <link rel="icon" href="/static/image/favicon.ico" type="image/x-icon">
+
+</head>
+<body>
+    <!-- 導覽列 -->
+    <nav class="navbar">
+        <a class="active" href="#" data-target="home" id="home-link">Home</a>
+        <a href="#" data-target="alphabet">Alphabet</a>
+        <a href="#" data-target="videos">Videos</a>
+        <a href="#" data-target="contact">Contact</a>
+    </nav>
+    <!-- home -->
+    <div id="home" class="content active">
+        <div id="feature-box-home-title">
+            <h1>西語字母發音學習</h1>
+        </div>
+        </br>
+        <div id="feature-box-home-alphabetselect">
+            <p>請選擇想要練習發音的西語字母</p>
+            <form method="Post" action="/">
+                <select name="speechFile" id="speechFileSelect" required>
+                    <option value="A.wav">A</option>
+                    <option value="B.wav">B</option>
+                    <option value="C.wav">C</option>
+                    <option value="D.wav">D</option>
+                    <option value="E.wav">E</option>
+                    <option value="F.wav">F</option>
+                    <option value="G.wav">G</option>
+                    <option value="H.wav">H</option>
+                    <option value="I.wav">I</option>
+                    <option value="J.wav">J</option>
+                    <option value="K.wav">K</option>
+                    <option value="L.wav">L</option>
+                    <option value="M.wav">M</option>
+                    <option value="N.wav">N</option>
+                    <option value="Ñ.wav">Ñ</option>
+                    <option value="O.wav">O</option>
+                    <option value="P.wav">P</option>
+                    <option value="Q.wav">Q</option>
+                    <option value="R.wav">R</option>
+                    <option value="S.wav">S</option>
+                    <option value="T.wav">T</option>
+                    <option value="U.wav">U</option>
+                    <option value="V.wav">V</option>
+                    <option value="W.wav">W</option>
+                    <option value="X.wav">X</option>
+                    <option value="Y.wav">Y</option>
+                    <option value="Z.wav">Z</option>
+                </select>
+                </br>
+                <button type="button" id="alphabetselect-start-button">確定</button>
+                </br>
+            </form>
+        </div>
+        <!-- 裝中間那2塊的容器，用來放在同一行的 -->
+        <div id="feature-box-home-container" class="hidden">
+            <div id="feature-box-home-example-audio">
+                <p>請按下播放圖示來聆聽範例音檔</p>
+                <button type="button" class="image-button-example-audio" id="example-audio-button"></button>
+                <audio id="example-audio" src="" type="audio/wav"></audio>
+                <h1 id="alphabet-text"></h1>
+            </div>
+            <div id="feature-box-home-record">
+                <p>請按下麥克風圖示開始錄音</p>
+                <div class="canvas-container">
+                    <canvas id="waveform"></canvas>
+                    <script src="/static/js/waveform.js"></script>
+                </div>
+                </br>
+                <button type="button" id="speech-recognition-button">開始分析</button>
+            </div>
+        </div>
+        <div id="feature-box-home-result" class="hidden">
+            <h1 id="result-text"></h1>
+            <p id="score-text"></p>
+        </div>
+    </div>  
+    <!-- alphabet -->
+    <div id="alphabet" class="content">
+        <div id="feature-box-alphabet">
+            <h1>西語字母表</h1>
+            </br></br></br></br>
+            <img src="/static/image/西語字母表.gif" alt="西語字母表圖片">
+            </br></br></br></br></br></br></br>
+        </div>
+    </div>
+    <!-- videos -->
+    <div id="videos" class="content">
+        <div id="feature-box-videos">
+            <h1>西語字母發音影片</h1>
+            </br>
+            <div class="video-container">
+                <iframe width="560" height="315" src="https://www.youtube.com/embed/1gTQRu2Weo4?si=MrZ12uIpCfmMMSvW" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+    <!-- contact -->
+    <div id="contact" class="content">
+        <div id="feature-box-contact">
+            <h1>關於我們</h1>
+            <p>聯繫方式。</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const links = document.querySelectorAll('.navbar a');
+            const contents = document.querySelectorAll('.content');
+            const homeLink = document.getElementById('home-link');
+            const alphabetselect_startButton = document.getElementById('alphabetselect-start-button');
+            const alphabetSelectBox = document.getElementById('feature-box-home-alphabetselect');
+            const homeContainer = document.getElementById('feature-box-home-container');
+            const homeResult = document.getElementById('feature-box-home-result');
+            const speechFileSelect = document.getElementById('speechFileSelect');
+            const exampleAudioButton = document.getElementById('example-audio-button');
+            const exampleAudio = document.getElementById('example-audio');
+            const alphabetText = document.getElementById('alphabet-text');
+            const resultText = document.getElementById('result-text');
+            const speechRecognitionButton = document.getElementById('speech-recognition-button');
+            const scoreText = document.getElementById('score-text');
+           
+            const pronunciations = {
+                'A': 'Aa [a]',
+                'B': 'Bb [be]',
+                'C': 'Cc [ce]',
+                'D': 'Dd [de]',
+                'E': 'Ee [e]',
+                'F': 'Ff [efe]',
+                'G': 'Gg [ge]',
+                'H': 'Hh [hache]',
+                'I': 'Ii [i]',
+                'J': 'Jj [jota]',
+                'K': 'Kk [ka]',
+                'L': 'Ll [ele]',
+                'M': 'Mm [eme]',
+                'N': 'Nn [ene]',
+                'Ñ': 'Ññ [eñe]',
+                'O': 'Oo [o]',
+                'P': 'Pp [pe]',
+                'Q': 'Qq [cu]',
+                'R': 'Rr [erre]',
+                'S': 'Ss [ese]',
+                'T': 'Tt [te]',
+                'U': 'Uu [u]',
+                'V': 'Vv [uve]',
+                'W': 'Ww [uve doble]',
+                'X': 'Xx [equis]',
+                'Y': 'Yy [i griega]',
+                'Z': 'Zz [zeta]'
+            };
+
+            links.forEach(link => {
+                link.addEventListener('click', function(event) {
+                    event.preventDefault();
+
+                    if (this.id === 'home-link') {
+                        location.reload();
+                        return;
+                    }
+
+                    // 移除所有链接的active类
+                    links.forEach(link => link.classList.remove('active'));
+
+                    // 添加当前链接的active类
+                    this.classList.add('active');
+
+                    // 获取目标内容ID
+                    const target = this.getAttribute('data-target');
+
+                    // 隐藏所有内容
+                    contents.forEach(content => content.classList.remove('active'));
+
+                    // 显示目标内容
+                    document.getElementById(target).classList.add('active');
+                });
+            });
+            alphabetselect_startButton.addEventListener('click', function() {
+                const speechFile = speechFileSelect.value;
+                fetch('/speech_file', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ speechFile: speechFile })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const selectedValue = speechFileSelect.options[speechFileSelect.selectedIndex].text;
+                    alphabetSelectBox.classList.add('hidden');
+                    homeContainer.classList.remove('hidden');
+                    homeContainer.classList.add('flexbox');
+                    homeResult.classList.add('flexbox');
+                    resultText.textContent = pronunciations[selectedValue];
+                    exampleAudio.src = `/static/audio/${selectedValue}.wav`;
+                })
+                .catch(error => console.error('Error:', error));
+            });
+
+            exampleAudioButton.addEventListener('click', function() {
+                exampleAudio.play();
+            });
+            speechRecognitionButton.addEventListener('click', function(event) {
+                event.preventDefault();
+
+                // 獲取音頻數據 (假設音頻數據已經保存到文件)
+                const formData = new FormData();
+                formData.append('audio_data', 'user_input.wav'); // 更換為實際的音頻文件
+
+                fetch('/process_audio', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 更新分數到頁面
+                    scoreText.textContent = `您的檢測分數為 ${data.score}`;
+                    resultText.style.fontSize = '30px';
+                })
+                .catch(error => console.error('Error:', error));
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+import tensorflow as tf
+import numpy as np
+from tensorflow import keras
+import librosa
+import sounddevice as sd
+from scipy.ndimage import maximum_filter1d
+import matplotlib.pyplot as plt
+import pyaudio
+import wave
+import os
+def load_audio(file_path):
+    audio, sr = librosa.load(file_path, sr=None)
+    return audio, sr
+def preprocess_audio(audio):
+    # 雜音預處理，例如濾波等
+    # 這裡我們使用 maximum_filter1d 函數來濾波
+    filtered_audio = maximum_filter1d(audio, size=3)
+    return filtered_audio
+def remove_silence(audio, threshold=0.02):
+    non_silent_intervals = librosa.effects.split(audio, top_db=threshold)
+    non_silent_audio = np.concatenate([audio[start:end] for start, end in non_silent_intervals])
+    return non_silent_audio
+def extract_mfcc(audio, sr):
+    mfccs = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=39)
+    return mfccs
+# 正規化 MFCC 特徵
+def normalize_mfcc(mfccs):
+    return (mfccs - np.mean(mfccs)) / np.std(mfccs)
+def TrainingData(mfccs_normalized_A, mfccs_normalized_B, mfccs_normalized_C):
+    xs=np.array(mfccs_normalized_A,dtype = float)
+    ys=np.array(mfccs_normalized_B,dtype = float)
+    zs=np.array(mfccs_normalized_C,dtype = float)
+    model = tf.keras.Sequential([keras.layers.Dense(units = 1,input_shape = [1])])
+    model.compile(optimizer='sgd',loss='mean_squared_error')
+    model.fit(xs,ys,epochs=2000)
+    output=0
+    print(model.predict(np.array([10.0])))
+if __name__ == '__main__':
+    audio_file_path_A = os.path.join('C:\\Users\\USER\\Desktop\\flask-templete\\static\\audio\\A bulidingData\\EspanaTeather.mp3')
+    audio_file_path_B = os.path.join('C:\\Users\\USER\\Desktop\\flask-templete\\static\\audio\\A bulidingData\\soundoftest(espana).mp3')
+    audio_file_path_C = os.path.join('C:\\Users\\USER\\Desktop\\flask-templete\\static\\audio\\A bulidingData\\soundoftest(mexico).mp3')
+    audio_A, sr_A = load_audio(audio_file_path_A)
+    audio_B, sr_B = load_audio(audio_file_path_B)
+    audio_C, sr_C = load_audio(audio_file_path_C)
+    # 去除靜音部分
+    audio_A1 = remove_silence(audio_A)
+    audio_B1 = remove_silence(audio_B)
+    audio_C1 = remove_silence(audio_C)
+    # 預處理雜音
+    audio_preA2 = preprocess_audio(audio_A1)
+    audio_preB2 = preprocess_audio(audio_B1)
+    audio_preC2 = preprocess_audio(audio_C1)
+    # 提取 MFCC 特徵
+    mfccs_A = extract_mfcc(audio_preA2, sr_A)
+    mfccs_B = extract_mfcc(audio_preB2, sr_B)
+    mfccs_C = extract_mfcc(audio_preC2, sr_C)
+    # 使兩個音檔的 MFCC 特徵具有相同的維度
+    min_length = min(mfccs_A.shape[1], mfccs_B.shape[1],mfccs_C.shape[1])
+    mfccs_A = mfccs_A[:, :min_length]
+    mfccs_B = mfccs_B[:, :min_length]
+    mfccs_C = mfccs_C[:, :min_length]
+    # 正規化 MFCC 特徵
+    mfccs_A_normalized = normalize_mfcc(mfccs_A)
+    mfccs_B_normalized = normalize_mfcc(mfccs_B)
+    mfccs_C_normalized = normalize_mfcc(mfccs_C)
+    print(mfccs_A_normalized)
