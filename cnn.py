@@ -161,7 +161,7 @@ def main():
     model_path = os.path.join(current_dir, 'cnn.keras')
 
     try:
-        history = train_model(mfcc_images_dir, model_path=model_path, epochs=500, batch_size=2048)
+        history = train_model(mfcc_images_dir, model_path=model_path, epochs=500, batch_size=4096)
         logging.info("Training completed successfully")
         if os.path.exists(model_path):
             logging.info(f"模型文件已成功创建: {model_path}")
