@@ -5,19 +5,35 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, Input
 from tensorflow.keras.optimizers import Adam
 import logging
 
 logging.basicConfig(level=logging.INFO)
 
-def audio_to_mfcc(audio_path, sr=44100):
-    y, sr = librosa.load(audio_path, sr=sr)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
-    return mfcc
+def audio_to_mfcc(audio_path, sr=44100, min_length=22050):
+    """
+    Convert audio file to MFCC with error handling for short files.
+    """
+    try:
+        y, sr = librosa.load(audio_path, sr=sr)
+        if len(y) < min_length:
+            raise ValueError(f"Audio file {audio_path} is too short for processing.")
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
+        return mfcc
+    except Exception as e:
+        logging.error(f"Error processing audio file {audio_path}: {str(e)}")
+        return None
 
 def save_mfcc_image(mfcc, output_path):
-    plt.figure(figsize=(10, 4))
+    """
+    Save MFCC as an image.
+    """
+    if mfcc is None:
+        logging.warning(f"Skipping saving MFCC image for {output_path} due to previous errors.")
+        return
+
+    plt.figure(figsize=(10, 10))
     librosa.display.specshow(mfcc, x_axis=None, y_axis=None)
     plt.axis('off')
     plt.gca().set_position([0, 0, 1, 1])
@@ -25,12 +41,14 @@ def save_mfcc_image(mfcc, output_path):
     plt.close()
 
 def process_audio_files(input_dir, output_dir):
+    """
+    Process audio files and save MFCC images, with error handling.
+    """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
     for category in os.listdir(input_dir):
         try:
-            # Check if the directory name is a valid integer between 1 and 37
             category_int = int(category)
             if category_int < 1 or category_int > 37:
                 raise ValueError(f"Invalid category number: {category}")
@@ -48,16 +66,23 @@ def process_audio_files(input_dir, output_dir):
                 audio_path = os.path.join(category_dir, audio_file)
                 try:
                     mfcc = audio_to_mfcc(audio_path)
-                    output_path = os.path.join(category_output_dir, f"{os.path.splitext(audio_file)[0]}.png")
-                    save_mfcc_image(mfcc, output_path)
-                    logging.info(f"Processed {audio_file} to {output_path}")
+                    if mfcc is not None:
+                        output_path = os.path.join(category_output_dir, f"{os.path.splitext(audio_file)[0]}.png")
+                        save_mfcc_image(mfcc, output_path)
+                        logging.info(f"Processed {audio_file} to {output_path}")
+                    else:
+                        logging.warning(f"Skipping {audio_file} due to MFCC processing error.")
                 except Exception as e:
                     logging.error(f"Failed to process {audio_file}: {str(e)}")
-    
+
 def create_model(model_path='cnn.keras'):
+    """
+    Create and compile the CNN model using Input layer.
+    """
     num_classes = 37
     model = Sequential()
-    model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)))
+    model.add(Input(shape=(128, 128, 3)))  # Use Input layer for the first layer
+    model.add(Conv2D(32, (3, 3), activation='relu'))
     model.add(MaxPooling2D((2, 2)))
     model.add(Conv2D(64, (3, 3), activation='relu'))
     model.add(MaxPooling2D((2, 2)))
@@ -74,6 +99,9 @@ def create_model(model_path='cnn.keras'):
     return model
 
 def train_model(train_dir, model_path='cnn.keras', epochs=None, batch_size=None):
+    """
+    Train the model with data augmentation and error handling.
+    """
     train_datagen = ImageDataGenerator(
         rescale=1./255,
         validation_split=0.2,
@@ -86,40 +114,74 @@ def train_model(train_dir, model_path='cnn.keras', epochs=None, batch_size=None)
         fill_mode='nearest'
     )
     
-    train_generator = train_datagen.flow_from_directory(
-        train_dir,
-        target_size=(128, 128),
-        batch_size=batch_size,
-        class_mode='sparse',
-        subset='training'
-    )
+    try:
+        train_generator = train_datagen.flow_from_directory(
+            train_dir,
+            target_size=(128, 128),
+            batch_size=batch_size or 32,  # 如果batch_size为None，使用默认值32
+            class_mode='sparse',
+            subset='training',
+            shuffle=True
+        )
+        
+        validation_generator = train_datagen.flow_from_directory(
+            train_dir,
+            target_size=(128, 128),
+            batch_size=batch_size or 32,  # 如果batch_size为None，使用默认值32
+            class_mode='sparse',
+            subset='validation',
+            shuffle=True
+        )
+    except Exception as e:
+        logging.error(f"Error initializing data generators: {str(e)}")
+        return None
     
-    validation_generator = train_datagen.flow_from_directory(
-        train_dir,
-        target_size=(128, 128),
-        batch_size=batch_size,
-        class_mode='sparse',
-        subset='validation'
-    )
-
     model = create_model(model_path)
     
-    history = model.fit(
-        train_generator,
-        epochs=epochs,
-        validation_data=validation_generator,
-        steps_per_epoch=train_generator.samples // batch_size,
-        validation_steps=validation_generator.samples // batch_size,
-        callbacks=[
-            tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.00001),
-            # tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
-            tf.keras.callbacks.ModelCheckpoint(model_path, save_best_only=True, monitor='val_loss')
-        ]
-    )
-    logging.info(f"Model saved to {model_path}")
-    return history
+    # 将生成器转换为tf.data.Dataset
+    train_dataset = tf.data.Dataset.from_generator(
+        lambda: train_generator,
+        output_signature=(
+            tf.TensorSpec(shape=(None, 128, 128, 3), dtype=tf.float32),
+            tf.TensorSpec(shape=(None,), dtype=tf.float32)
+        )
+    ).repeat()
+
+    validation_dataset = tf.data.Dataset.from_generator(
+        lambda: validation_generator,
+        output_signature=(
+            tf.TensorSpec(shape=(None, 128, 128, 3), dtype=tf.float32),
+            tf.TensorSpec(shape=(None,), dtype=tf.float32)
+        )
+    ).repeat()
+    
+    # 计算实际的步数
+    steps_per_epoch = len(train_generator)
+    validation_steps = len(validation_generator)
+    
+    try:
+        history = model.fit(
+            train_dataset,
+            epochs=epochs or 100,  # 如果epochs为None，使用默认值100
+            validation_data=validation_dataset,
+            steps_per_epoch=steps_per_epoch,
+            validation_steps=validation_steps,
+            callbacks=[
+                tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.00001),
+                tf.keras.callbacks.ModelCheckpoint(model_path, save_best_only=True, monitor='val_loss'),
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+            ]
+        )
+        logging.info(f"Model saved to {model_path}")
+        return history
+    except Exception as e:
+        logging.error(f"Error during model training: {str(e)}")
+        return None
 
 def process_test_audio(audio_path, model_path='cnn.keras'):
+    """
+    Process a test audio file and make predictions.
+    """
     temp_image_path = 'temp_mfcc.png'
     
     mfcc = audio_to_mfcc(audio_path)
@@ -142,6 +204,9 @@ def process_test_audio(audio_path, model_path='cnn.keras'):
     return predicted_class, confidence
 
 def main():
+    """
+    Main function to process audio and train the model.
+    """
     # 音訊轉MFCC圖片
     current_dir = os.path.dirname(os.path.abspath(__file__))
     input_dir = os.path.join(current_dir, 'chinotrain')
@@ -150,7 +215,6 @@ def main():
     process_audio_files(input_dir, output_dir)
 
     # 訓練階段
-
     mfcc_images_dir = output_dir
     
     if not os.path.exists(mfcc_images_dir):
@@ -161,12 +225,15 @@ def main():
     model_path = os.path.join(current_dir, 'cnn.keras')
 
     try:
-        history = train_model(mfcc_images_dir, model_path=model_path, epochs=500, batch_size=256)
-        logging.info("Training completed successfully")
-        if os.path.exists(model_path):
-            logging.info(f"模型文件已成功创建: {model_path}")
+        history = train_model(mfcc_images_dir, model_path=model_path, epochs=100, batch_size=2048)
+        if history is not None:
+            logging.info("Training completed successfully")
+            if os.path.exists(model_path):
+                logging.info(f"模型文件已成功创建: {model_path}")
+            else:
+                logging.error(f"模型文件未能创建: {model_path}")
         else:
-            logging.error(f"模型文件未能创建: {model_path}")
+            logging.error("Training failed.")
     except Exception as e:
         logging.error(f"An error occurred during training: {str(e)}")
         return
