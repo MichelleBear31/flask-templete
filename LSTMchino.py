@@ -130,8 +130,7 @@ def main():
         return
 
     test_audio_path = os.path.join(current_dir,'static', 'audio', 'user_input.wav')
-    model_path = 'LSTM_model.keras'
-
+    model_path = os.path.join(current_dir, 'LSTM_model.keras')
     try:
         predicted_class, confidence = process_test_audio(test_audio_path, model_path, categories)
         logging.info(f"Test audio predicted class: {predicted_class}")

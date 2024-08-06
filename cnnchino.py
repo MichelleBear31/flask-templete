@@ -112,7 +112,7 @@ def train_model(train_dir, model_path='cnn.keras', epochs=None, batch_size=None)
         validation_steps=validation_generator.samples // batch_size,
         callbacks=[
             tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.00001),
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+            # tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
             tf.keras.callbacks.ModelCheckpoint(model_path, save_best_only=True, monitor='val_loss')
         ]
     )
@@ -161,7 +161,7 @@ def main():
     model_path = os.path.join(current_dir, 'cnn.keras')
 
     try:
-        history = train_model(mfcc_images_dir, model_path=model_path, epochs=500, batch_size=4096)
+        history = train_model(mfcc_images_dir, model_path=model_path, epochs=500, batch_size=256)
         logging.info("Training completed successfully")
         if os.path.exists(model_path):
             logging.info(f"模型文件已成功创建: {model_path}")
