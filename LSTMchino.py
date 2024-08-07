@@ -77,7 +77,7 @@ def create_model(num_classes=37):
     model.compile(optimizer=Adam(learning_rate=0.0001), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 
-def train_model(train_dir, model_path='LSTM_model.keras', epochs=20, batch_size=64):
+def train_model(train_dir, model_path='LSTM_model.keras', epochs=None, batch_size=None):
     X, y, categories = load_data(train_dir)
     
     model = create_model(num_classes=len(categories))
@@ -123,7 +123,7 @@ def main():
     try:
         # Define the model path in the current directory
         model_path = os.path.join(current_dir, 'LSTM_model.keras')
-        history, categories = train_model(output_dir, model_path=model_path,epochs=1020, batch_size=64)
+        history, categories = train_model(output_dir, model_path=model_path,epochs=1500, batch_size=128)
         logging.info("Training completed successfully")
     except Exception as e:
         logging.error(f"An error occurred during training: {str(e)}")

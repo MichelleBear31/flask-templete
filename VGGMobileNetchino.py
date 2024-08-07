@@ -5,22 +5,25 @@ import matplotlib.pyplot as plt
 import logging
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.applications.mobilenet import MobileNet
+from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.layers import Dense, Flatten, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.regularizers import l2
 from sklearn.preprocessing import LabelBinarizer
 from tensorflow.keras.preprocessing.image import img_to_array, load_img
-import math  # Import math for ceiling calculations
+import math
+from sklearn.model_selection import train_test_split
+
 
 def audio_to_mfcc(audio_path, n_mfcc=40):
     y, sr = librosa.load(audio_path, sr=44100)
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc)
     return mfcc
 
+
 def save_mfcc_image(mfcc, output_path):
-    plt.figure(figsize=(10, 4))
+    plt.figure(figsize=(1, 1))
     plt.imshow(mfcc, aspect='auto', origin='lower', cmap='viridis')
     plt.axis('off')
     plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
@@ -43,113 +46,175 @@ def load_data(input_dir, output_dir):
                 if audio_path.endswith('.wav'):
                     try:
                         mfcc = audio_to_mfcc(audio_path)
-                        output_path = os.path.join(label_output_dir, file.replace('.wav', '.png'))
+                        output_path = os.path.join(
+                            label_output_dir, file.replace('.wav', '.png'))
                         save_mfcc_image(mfcc, output_path)
-                        # 确保图片尺寸为128x128
-                        image = img_to_array(load_img(output_path, target_size=(128, 128)))
+                        image = img_to_array(
+                            load_img(output_path, target_size=(128, 128)))
                         images.append(image)
                         labels.append(label)
                     except Exception as e:
                         print(f"Error processing {audio_path}: {e}")
     return np.array(images), np.array(labels)
 
+
 def preprocess_data(images, labels):
     lb = LabelBinarizer()
     labels = lb.fit_transform(labels)
+    images = images.astype('float32') / 255.0  # Normalize the images
     return images, labels, lb
+
 
 def create_datagen():
     return ImageDataGenerator(
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        horizontal_flip=True
+        rotation_range=30,
+        width_shift_range=0.3,
+        height_shift_range=0.3,
+        zoom_range=0.3,
+        horizontal_flip=True,
+        fill_mode='nearest'
     )
 
-def create_model(base_model, num_classes):
+
+def create_mobilenet_model(num_classes):
+    base_model = MobileNetV2(
+        weights='imagenet', include_top=False, input_shape=(128, 128, 3))
     x = base_model.output
     x = Flatten()(x)
-    x = Dense(256, activation='relu', kernel_regularizer=l2(0.01))(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(0.01))(x)
     x = Dropout(0.5)(x)
     predictions = Dense(num_classes, activation='softmax')(x)
+
     model = Model(inputs=base_model.input, outputs=predictions)
+
+    # Fine-tune only the top layers
     for layer in base_model.layers:
         layer.trainable = False
+
     return model
 
-def compile_and_train_model(model, train_generator, learning_rate, epochs, steps_per_epoch):
+
+def create_vgg_model(num_classes):
+    base_model = VGG16(weights='imagenet',
+                       include_top=False, input_shape=(128, 128, 3))
+    x = base_model.output
+    x = Flatten()(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(0.01))(x)
+    x = Dropout(0.5)(x)
+    predictions = Dense(num_classes, activation='softmax')(x)
+
+    model = Model(inputs=base_model.input, outputs=predictions)
+
+    # Fine-tune only the top layers
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    return model
+
+
+def compile_and_train_model(model, train_generator, validation_generator, learning_rate, epochs, steps_per_epoch, validation_steps, model_path='model.keras'):
     optimizer = SGD(learning_rate=learning_rate, momentum=0.9)
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-    model.fit(train_generator, epochs=epochs, steps_per_epoch=steps_per_epoch)
-    return model
+    model.compile(optimizer=optimizer, loss='categorical_crossentropy',
+                  metrics=['accuracy'])
 
-def save_model(model, filename):
-    model.save(filename)
+    history = model.fit(
+        train_generator.repeat(),  # Ensure the generator repeats
+        epochs=epochs,
+        steps_per_epoch=steps_per_epoch,
+        validation_data=validation_generator.repeat(),  # Ensure the generator repeats
+        validation_steps=validation_steps
+    )
 
-def evaluate_model(model, test_generator, steps):
-    loss, accuracy = model.evaluate(test_generator, steps=steps)
-    return loss, accuracy
+    model.save(model_path)
+    logging.info(f"Model saved to {model_path}")
+    return model, history
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-input_dir = os.path.join(current_dir, 'chinotrain')
-output_dir = os.path.join(current_dir, 'VGG_MobileNet_mfcc_images')
+
+def plot_comparison(history1, history2, title, metric='accuracy'):
+    plt.plot(history1.history[metric], label='MobileNetV2')
+    plt.plot(history1.history[f'val_{metric}'], label='MobileNetV2 Val')
+    plt.plot(history2.history[metric], label='VGG16')
+    plt.plot(history2.history[f'val_{metric}'], label='VGG16 Val')
+    plt.title(title)
+    plt.xlabel('Epochs')
+    plt.ylabel(metric.capitalize())
+    plt.legend()
+    plt.show()
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    input_dir = os.path.join(current_dir, 'chinotrain')
+    output_dir = os.path.join(current_dir, 'VGG_MobileNet_mfcc_images')
+
     logging.info(f"Input directory: {input_dir}")
     logging.info(f"Output directory: {output_dir}")
-    
+
     create_output_dir(output_dir)
-    
-    # 加载和预处理数据
+
+    # Load and preprocess data
     images, labels = load_data(input_dir, output_dir)
     if images.size == 0 or labels.size == 0:
         print("No data loaded. Please check the input directory and audio files.")
         return
-    
+
     images, labels, lb = preprocess_data(images, labels)
-    
-    # 訓練參數
-    learning_rate = 0.0001
-    epochs = 10  # 增加 epochs 以防止過擬合
-    batch_size = 32  # 增大 batch_size 以加速訓練
-    steps_per_epoch = math.ceil(len(images) / batch_size)  # 确保每个 batch 都有数据
-    
-    # 資料增強
+
+    # Log data size
+    logging.info(f"Loaded {len(images)} images with {len(labels)} labels.")
+
+    # Split data into training and validation sets
+    X_train, X_val, y_train, y_val = train_test_split(
+        images, labels, test_size=0.2, random_state=42)
+
+    # Training parameters
+    learning_rate = 0.0001  # Adjusted learning rate
+    epochs = 100
+    batch_size = 2048  # Reduce batch size to better handle small datasets
+    steps_per_epoch = max(1, len(X_train) // batch_size)
+    validation_steps = max(1, len(X_val) // batch_size)
+
+    # Data augmentation and generator creation
     datagen = create_datagen()
-    train_generator = datagen.flow(images, labels, batch_size=batch_size)
+    train_generator = datagen.flow(
+        X_train, y_train, batch_size=batch_size, shuffle=True)
+    validation_generator = datagen.flow(
+        X_val, y_val, batch_size=batch_size, shuffle=False)
 
-    # 确保数据 generator 正常工作
-    for i, (image_batch, label_batch) in enumerate(train_generator):
-        print(f"Batch {i}: {len(image_batch)} samples")
-        if i >= steps_per_epoch - 1:
-            break
+    # Train MobileNetV2 model
+    mobilenet_model = create_mobilenet_model(len(lb.classes_))
+    mobilenet_model, mobilenet_history = compile_and_train_model(
+        mobilenet_model,
+        train_generator,
+        validation_generator,
+        learning_rate,
+        epochs,
+        steps_per_epoch,
+        validation_steps,
+        'MobileNetV2_model.keras'
+    )
 
-    # 訓練 VGG16 模型
-    base_model_vgg = VGG16(weights='imagenet', include_top=False, input_shape=(128, 128, 3))  # 使用新尺寸
-    model_vgg = create_model(base_model_vgg, len(lb.classes_))
-    model_vgg = compile_and_train_model(model_vgg, train_generator, learning_rate, epochs, steps_per_epoch)
-    save_model(model_vgg, 'VGGMobileNet_model.keras')
+    # Train VGG16 model
+    vgg_model = create_vgg_model(len(lb.classes_))
+    vgg_model, vgg_history = compile_and_train_model(
+        vgg_model,
+        train_generator,
+        validation_generator,
+        learning_rate,
+        epochs,
+        steps_per_epoch,
+        validation_steps,
+        'VGG16_model.keras'
+    )
 
-    # 測試音檔辨識
-    def test_audio_recognition(test_audio_path):
-        mfcc = audio_to_mfcc(test_audio_path)
-        save_mfcc_image(mfcc, 'test_mfcc.png')
-        test_image = img_to_array(load_img('test_mfcc.png', target_size=(128, 128)))  # 使用新尺寸
-        test_image = np.expand_dims(test_image, axis=0)
+    # Compare Models
+    plot_comparison(mobilenet_history, vgg_history,
+                    'Model Accuracy Comparison')
+    plot_comparison(mobilenet_history, vgg_history,
+                    'Model Loss Comparison', metric='loss')
 
-        # 預測並輸出匹配度
-        prediction = model_vgg.predict(test_image)
-        predicted_class = np.argmax(prediction)
-        confidence = prediction[0][predicted_class]
-        predicted_label = lb.classes_[predicted_class]
-
-        print(f'測試音檔預測類別: {predicted_label}, 信心度: {confidence:.2f}')
-
-    # 測試一個音檔（替換為你的測試音檔路徑）
-    test_audio_path = os.path.join(current_dir,'static','audio','user_input.wav')
-    test_audio_recognition(test_audio_path)
 
 if __name__ == "__main__":
     main()
