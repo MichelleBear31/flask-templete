@@ -13,3 +13,11 @@ LSTM的架構是語音轉MFCC_array，再去直接比對測試和標準
 
 CNN、ResNet50、VGGMobileNet 都是語音轉MFCC特徵，再去轉成MFCC圖片，模型利用圖片進行訓練，再去比對測試與標準圖片的差異。
 如果沒有一個好的圖片特徵擷取，恐怕訓練效果會很差。
+
+CNN accuracy 沒辦法上去
+VGG and MolileNet模型沒上去
+GNN模型沒上去
+
+找到抓圖片特徵的最好工具，還有MFCC如何轉成可以呈現重要特徵圖片的工具
+目前LSTM的訓練效果是最好的，但是不是用圖片
+其他用圖片的資料accuracy 一直上不去
