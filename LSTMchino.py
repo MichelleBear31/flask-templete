@@ -74,10 +74,20 @@ def split_dataset(input_dir, output_train_dir, output_test_dir, test_size=0.3):
             os.makedirs(category_test_dir)
         
         for file in train_files:
-            os.rename(os.path.join(category_path, file), os.path.join(category_train_dir, file))
+            src = os.path.join(category_path, file)
+            dest = os.path.join(category_train_dir, file)
+            try:
+                os.rename(src, dest)
+            except FileExistsError:
+                logging.warning(f"File already exists: {dest}, skipping.")
         
         for file in test_files:
-            os.rename(os.path.join(category_path, file), os.path.join(category_test_dir, file))
+            src = os.path.join(category_path, file)
+            dest = os.path.join(category_test_dir, file)
+            try:
+                os.rename(src, dest)
+            except FileExistsError:
+                logging.warning(f"File already exists: {dest}, skipping.")
         
         logging.info(f"Category {category}: {len(train_files)} files for training, {len(test_files)} files for testing.")
 
@@ -105,7 +115,7 @@ def load_data(data_dir, max_len=87):
     logging.info(f"Final data shapes: X={X.shape}, y={y.shape}")
     return X, y, categories
 
-def create_model(num_classes=37):
+def create_model(num_classes=3):
     model = Sequential()
     model.add(LSTM(128, input_shape=(None, 20), return_sequences=True))
     model.add(BatchNormalization())
@@ -209,7 +219,7 @@ def main():
             logging.error(f"An error occurred during training: {str(e)}")
             return
 
-    test_audio_path = os.path.join(current_dir, 'static', 'audio', 'test1.wav')
+    test_audio_path = os.path.join(current_dir, 'static', 'audio', 'test3.wav')
     try:
         predicted_class, confidence = process_test_audio(test_audio_path, model_path, categories)
         logging.info(f"Test audio predicted class: {predicted_class}")
