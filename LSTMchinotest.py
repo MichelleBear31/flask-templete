@@ -258,7 +258,7 @@ def visual_speature():
 def main():
     # 音訊轉MFCC特徵
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    input_dir = os.path.join(current_dir, 'ㄅㄆㄇ')
+    input_dir = os.path.join(current_dir, 'chinotrain')
     output_mfcc_dir = os.path.join(current_dir, 'LSTM_mfcc_arrays')
     
     model_path = os.path.join(current_dir, 'LSTM_model_with_attention.keras')

@@ -3,8 +3,11 @@ import librosa
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
+from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization,Layer
 from tensorflow.keras.optimizers import Adam
+import tensorflow.keras.backend as K
+from keras.saving import register_keras_serializable
+import matplotlib.pyplot as plt
 import random
 from sklearn.model_selection import train_test_split
 import logging
@@ -14,7 +17,7 @@ gpus=tf.config.experimental.list_physical_devices(device_type='GPU')
 #print("Num GPUs Available: ", len(gpus))
 tf.config.experimental.set_visible_devices(devices=gpus[0:2],device_type='GPU')
 logging.basicConfig(level=logging.INFO)
-
+print(tf.test.is_gpu_available()) 
 def audio_to_mfcc(audio_path, sr=44100, max_len=87):
     y, sr = librosa.load(audio_path, sr=sr)
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
@@ -115,6 +118,81 @@ def load_data(data_dir, max_len=87):
     logging.info(f"Final data shapes: X={X.shape}, y={y.shape}")
     return X, y, categories
 
+@register_keras_serializable(package="Custom", name="Attention")
+class Attention(Layer):
+    def __init__(self, **kwargs):
+        super(Attention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.W = self.add_weight(name='attention_weight', 
+                                 shape=(input_shape[-1], input_shape[-1]),
+                                 initializer='glorot_uniform',
+                                 trainable=True)
+        self.b = self.add_weight(name='attention_bias', 
+                                 shape=(input_shape[-1],),  # 确保与输入的最后一个维度匹配
+                                 initializer='zeros',
+                                 trainable=True)
+        super(Attention, self).build(input_shape)
+
+    def call(self, x):
+        e = tf.keras.backend.tanh(tf.keras.backend.dot(x, self.W) + self.b)
+        alpha = tf.keras.backend.softmax(e, axis=1)
+        context = tf.keras.backend.sum(alpha * x, axis=1)
+        return context
+
+def create_model_with_attention(num_classes=2):
+    inputs = tf.keras.Input(shape=(87, 20))  # 创建输入层
+    x = LSTM(128, return_sequences=True)(inputs)  # 确保提供了 units 参数
+    x = BatchNormalization()(x)
+    x = LSTM(64, return_sequences=True)(x)  # 确保提供了 units 参数
+    x = Attention()(x)  # 添加注意力层
+    x = Dense(512, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    outputs = Dense(num_classes, activation='softmax')(x)  # 输出层
+    
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)  # 创建模型
+    
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001), 
+                  loss='sparse_categorical_crossentropy', 
+                  metrics=['accuracy'])
+    
+    return model
+
+def train_model_with_attention(train_dir, model_path='LSTM_model.keras', history_path='LSTM_history.pkl', epochs=None, batch_size=None):
+    X, y, categories = load_data(train_dir)
+    
+    model = create_model_with_attention(num_classes=len(categories))
+    
+    # 在每个 epoch 结束时保存激活值
+    class SaveActivations(tf.keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            # 使用模型获取中间层的输出
+            intermediate_model = tf.keras.Model(inputs=model.input,
+                                                outputs=model.get_layer('attention').output)
+            activations = intermediate_model.predict(X)
+            np.save(f'activations_epoch_{epoch}.npy', activations)
+            logging.info(f"Saved activations for epoch {epoch}")
+
+    history = model.fit(
+        X, y,
+        epochs=epochs,
+        batch_size=batch_size,
+        validation_split=0.2,
+        callbacks=[
+            SaveActivations(),
+            tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.00001),
+        ]
+    )
+    
+    model.save(model_path)
+    logging.info(f"Model with attention saved to {model_path}")
+    
+    with open(history_path, 'wb') as f:
+        pickle.dump(history.history, f)
+    logging.info(f"Training history with attention saved to {history_path}")
+
+    return history, categories
+
 def create_model(num_classes=3):
     model = Sequential()
     model.add(LSTM(128, input_shape=(None, 20), return_sequences=True))
@@ -166,6 +244,17 @@ def process_test_audio(audio_path, model_path='LSTM_model.keras', categories=Non
     
     return category_name, confidence
 
+def visual_speature():
+        # 加载某个 epoch 的激活值
+    activations = np.load('activations_epoch_499.npy')
+    # 可视化激活值
+    plt.imshow(activations.T, aspect='auto', cmap='viridis')
+    plt.colorbar()
+    plt.title('Attention Layer Activations')
+    plt.xlabel('Time Steps')
+    plt.ylabel('Attention Units')
+    plt.show()
+
 def main():
     # 音訊轉MFCC特徵
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -188,7 +277,7 @@ def main():
             split_dataset(output_mfcc_dir, output_train_dir, output_test_dir, test_size=0.3)
             
             try:
-                history, categories = train_model(output_train_dir, model_path=model_path, history_path=history_path, epochs=500, batch_size=128)
+                history, categories = train_model_with_attention(output_train_dir, model_path=model_path, history_path=history_path, epochs=700, batch_size=128)
                 logging.info("Training completed successfully")
             except Exception as e:
                 logging.error(f"An error occurred during training: {str(e)}")
@@ -213,7 +302,7 @@ def main():
         split_dataset(output_mfcc_dir, output_train_dir, output_test_dir, test_size=0.3)
         
         try:
-            history, categories = train_model(output_train_dir, model_path=model_path, history_path=history_path, epochs=500, batch_size=128)
+            history, categories = train_model_with_attention(output_train_dir, model_path=model_path, history_path=history_path, epochs=650, batch_size=128)
             logging.info("Training completed successfully")
         except Exception as e:
             logging.error(f"An error occurred during training: {str(e)}")
@@ -226,5 +315,9 @@ def main():
         logging.info(f"Test audio confidence level: {confidence * 100:.2f}%")
     except Exception as e:
         logging.error(f"An error occurred during prediction for test audio: {str(e)}")
+
 if __name__ == "__main__":
-    main()
+
+    # visual_speature()
+
+    # main()
