@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-source_folder = os.path.join(current_dir, 'chinotrain')  # Update to new directory
-target_folder = 'wave_foto'
+source_folder = os.path.join(current_dir, 'chinotrainV2')  # Update to new directory
+target_folder = os.path.join(current_dir,'wave_fotoV2')
 
 # 建立目標資料夾
 if not os.path.exists(target_folder):
     os.makedirs(target_folder)
 
 # 遍歷每一個資料夾
-for folder_num in range(1, 38):
+for folder_num in range(1, 4):
     folder_name = str(folder_num)
     folder_path = os.path.join(source_folder, folder_name)
     target_subfolder = os.path.join(target_folder, folder_name)

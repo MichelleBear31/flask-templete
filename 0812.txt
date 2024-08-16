@@ -1,0 +1,2 @@
+語音資料庫:
+https://commonvoice.mozilla.org/zh-TW/datasets
