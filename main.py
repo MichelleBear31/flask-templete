@@ -409,100 +409,102 @@ if __name__ == '__main__':
     audio_file_path_B=os.path.join(current_dir,'static','audio','A.wav')
     # record_audio_to_file('D:\\系統檔 Documents\\GitHub\\Alcoho.github.io\\flask-templete\\static\\audio\\user_input.wav',duration=3, channels=1, rate=44100, frames_per_buffer=1)
     audio_B, sr_B = load_audio(audio_file_path_B)
-    print(audio_B)
-    audio_pre_A=remove_silence(audio_A)
-    audio_pre_B=remove_silence(audio_B)
-    End_pont_detection(audio_A,sr_A)
-    End_pont_detection(audio_B,sr_B)
-    pitch_A=extract_pitch(audio_pre_A,sr_A)#pitch tracking A 基頻軌跡
-    pitch_B=extract_pitch(audio_pre_B,sr_B)#pitch tracking B
-    print(pitch_A)
-    print(pitch_B)
-    librosa.display.waveshow(audio_pre_A, sr=sr_A)
-    plt.title('Teacher_audio')
-    plt.show()
-    plt.figure()
-    librosa.display.waveshow(audio_pre_B, sr=sr_B)
-    plt.title('Student_audio')
-    plt.show()
-    amplitude(audio_pre_B,sr_B)
-    ave_mag_A =AveMag(audio_pre_A,sr_A)#音量強度曲線
-    ave_mag_B = AveMag(audio_pre_B,sr_B)#音量強度曲線
-    #音量強度曲線插值處理
-    target_length = max(len(ave_mag_A), len(ave_mag_B))
-    ave_mag_A_interp = Interpolation(ave_mag_A, target_length)
-    ave_mag_B_interp = Interpolation(ave_mag_B, target_length)
-    #基頻軌跡插值處理
-    target_length = max(len(pitch_A), len(pitch_B))
-    pitch_A_interp = Interpolation(pitch_A, target_length)
-    pitch_B_interp = Interpolation(pitch_A, target_length)
-    lin_pitch_A,lin_pitch_B=linear_shifting(pitch_A_interp,pitch_B_interp)
-    # 线性缩放
-    ave_mag_B_scaled_ajt, ave_mag_A_scaled_ajt = linear_scaling(ave_mag_A_interp, ave_mag_B_interp)
-    # 确保输入为1维
-    ave_mag_A_scaled = np.array(ave_mag_A_scaled_ajt).flatten()
-    ave_mag_B_scaled = np.array(ave_mag_B_scaled_ajt).flatten()
-    plt.plot(ave_mag_A_scaled, label='Scaled Audio A')
-    plt.plot(ave_mag_B_scaled, label='Scaled Audio B')
-    plt.legend()
-    plt.title('Scaled Average Magnitude')
-    plt.xlabel('Frames')
-    plt.ylabel('Scaled Average Magnitude')
-    plt.show()
+    # 使用 os.path.join 來組合完整的檔案路徑
+    file_path = os.path.join(current_dir, 'audio_B.txt')
+    #np.savetxt(file_path, audio_A)
+    # audio_pre_A=remove_silence(audio_A)
+    # audio_pre_B=remove_silence(audio_B)
+    # End_pont_detection(audio_A,sr_A)
+    # End_pont_detection(audio_B,sr_B)
+    # pitch_A=extract_pitch(audio_pre_A,sr_A)#pitch tracking A 基頻軌跡
+    # pitch_B=extract_pitch(audio_pre_B,sr_B)#pitch tracking B
+    # print(pitch_A)
+    # print(pitch_B)
+    # librosa.display.waveshow(audio_pre_A, sr=sr_A)
+    # plt.title('Teacher_audio')
+    # plt.show()
+    # plt.figure()
+    # librosa.display.waveshow(audio_pre_B, sr=sr_B)
+    # plt.title('Student_audio')
+    # plt.show()
+    # amplitude(audio_pre_B,sr_B)
+    # ave_mag_A =AveMag(audio_pre_A,sr_A)#音量強度曲線
+    # ave_mag_B = AveMag(audio_pre_B,sr_B)#音量強度曲線
+    # #音量強度曲線插值處理
+    # target_length = max(len(ave_mag_A), len(ave_mag_B))
+    # ave_mag_A_interp = Interpolation(ave_mag_A, target_length)
+    # ave_mag_B_interp = Interpolation(ave_mag_B, target_length)
+    # #基頻軌跡插值處理
+    # target_length = max(len(pitch_A), len(pitch_B))
+    # pitch_A_interp = Interpolation(pitch_A, target_length)
+    # pitch_B_interp = Interpolation(pitch_A, target_length)
+    # lin_pitch_A,lin_pitch_B=linear_shifting(pitch_A_interp,pitch_B_interp)
+    # # 线性缩放
+    # ave_mag_B_scaled_ajt, ave_mag_A_scaled_ajt = linear_scaling(ave_mag_A_interp, ave_mag_B_interp)
+    # # 确保输入为1维
+    # ave_mag_A_scaled = np.array(ave_mag_A_scaled_ajt).flatten()
+    # ave_mag_B_scaled = np.array(ave_mag_B_scaled_ajt).flatten()
+    # plt.plot(ave_mag_A_scaled, label='Scaled Audio A')
+    # plt.plot(ave_mag_B_scaled, label='Scaled Audio B')
+    # plt.legend()
+    # plt.title('Scaled Average Magnitude')
+    # plt.xlabel('Frames')
+    # plt.ylabel('Scaled Average Magnitude')
+    # plt.show()
 
-    #提取 MFCC 特徵
-    mfccs_A= extract_mfcc(audio_pre_A, sr_A)
-    mfccs_B= extract_mfcc(audio_pre_B, sr_B)
-    # 使用 CMS 消除通道效應
-    mfccs_A_cms = cepstral_mean_subtraction(mfccs_A)
-    mfccs_B_cms = cepstral_mean_subtraction(mfccs_B)
-    #音量強度曲線的計算 DTW 距離和路徑
-    distanceAVG, pathAVG = dynamic_time_warpingAVG(ave_mag_A_scaled, ave_mag_B_scaled)
-    #基頻軌跡的 DTW 距離和路徑
-    distancePIT, pathPIT = dynamic_time_warpingAVG(lin_pitch_A, lin_pitch_B)
-    #MFCC的計算 DTW 距離和路徑
-    distanceMFCC, pathMFCC = dynamic_time_warpingMFCC(mfccs_A_cms, mfccs_B_cms)
+    # #提取 MFCC 特徵
+    # mfccs_A= extract_mfcc(audio_pre_A, sr_A)
+    # mfccs_B= extract_mfcc(audio_pre_B, sr_B)
+    # # 使用 CMS 消除通道效應
+    # mfccs_A_cms = cepstral_mean_subtraction(mfccs_A)
+    # mfccs_B_cms = cepstral_mean_subtraction(mfccs_B)
+    # #音量強度曲線的計算 DTW 距離和路徑
+    # distanceAVG, pathAVG = dynamic_time_warpingAVG(ave_mag_A_scaled, ave_mag_B_scaled)
+    # #基頻軌跡的 DTW 距離和路徑
+    # distancePIT, pathPIT = dynamic_time_warpingAVG(lin_pitch_A, lin_pitch_B)
+    # #MFCC的計算 DTW 距離和路徑
+    # distanceMFCC, pathMFCC = dynamic_time_warpingMFCC(mfccs_A_cms, mfccs_B_cms)
 
-    plt.figure()
-    plt.subplot(3, 1, 1)
-    plt.plot(ave_mag_A, label='Original A')
-    plt.plot(ave_mag_B, label='Original B')
-    plt.legend()
+    # plt.figure()
+    # plt.subplot(3, 1, 1)
+    # plt.plot(ave_mag_A, label='Original A')
+    # plt.plot(ave_mag_B, label='Original B')
+    # plt.legend()
 
-    plt.subplot(3, 1, 2)
-    plt.plot(ave_mag_A_interp, label='Interpolated A')
-    plt.plot(ave_mag_B_interp, label='Interpolated B')
-    plt.legend()
+    # plt.subplot(3, 1, 2)
+    # plt.plot(ave_mag_A_interp, label='Interpolated A')
+    # plt.plot(ave_mag_B_interp, label='Interpolated B')
+    # plt.legend()
 
-    plt.subplot(3, 1, 3)
-    plt.plot(ave_mag_A_scaled, label='Scaled A')
-    plt.plot(ave_mag_B_scaled, label='Scaled B')
-    plt.legend()
+    # plt.subplot(3, 1, 3)
+    # plt.plot(ave_mag_A_scaled, label='Scaled A')
+    # plt.plot(ave_mag_B_scaled, label='Scaled B')
+    # plt.legend()
 
-    plt.tight_layout()
-    plt.show()
-    # 打印結果
-    print(f"The distanceAVG between the two audio files is: {distanceAVG}")
-    print(f"The DTW path is: {pathAVG}")
-    print(f"The distancePIT between the two audio files is: {distancePIT}")
-    print(f"The DTW path is: {pathPIT}")
-    print(f"The distanceMFCC between the two audio files is: {distanceMFCC}")
-    print(f"The DTW path is: {pathMFCC}")
-    score=distance_to_score(distanceAVG, 0.00000000150193575922916, 9.82746911958941)
-    print(score)
-    score=distance_to_score(distancePIT, 0.00000000150193575922916, 9.82746911958941)
-    print(score)
-    #return 100 / (1 + a * (dist ** b))
-    # Assuming ave_mag_A_scaled, ave_mag_B_scaled, lin_pitch_A, lin_pitch_B, mfccs_A_cms, mfccs_B_cms are defined and populated with your data.
-    distAVG, distPIT, distMFCC = calculate_distances(ave_mag_A_scaled, ave_mag_B_scaled, lin_pitch_A, lin_pitch_B, mfccs_A_cms, mfccs_B_cms)
-    # Initial guess for optimization: [a1, b1, a2, b2, a3, b3, w1, w2, w3]
-    #a b為距離轉成分數的參數,w為為三個特徵的權重
-    #為了求得我們設計了以下實驗：首先我們先收集10句CNN互動英語的句字，當成標準語音，再請實驗室同學依此10句錄音，當成測試語音，總共收集了320句測試語音，每一句跟標準答案比
-    initial_guess = [1, 1, 1, 1, 1, 1, 0.7, 0.2, 0.1]
-    optimized_params = optimize_parameters(distAVG, distPIT, distMFCC, initial_guess)
-    print("Optimized parameters:", optimized_params)
-    total_score=scoring_function(optimized_params, distAVG, distPIT, distMFCC)
-    print("Total score:", total_score)
+    # plt.tight_layout()
+    # plt.show()
+    # # 打印結果
+    # print(f"The distanceAVG between the two audio files is: {distanceAVG}")
+    # print(f"The DTW path is: {pathAVG}")
+    # print(f"The distancePIT between the two audio files is: {distancePIT}")
+    # print(f"The DTW path is: {pathPIT}")
+    # print(f"The distanceMFCC between the two audio files is: {distanceMFCC}")
+    # print(f"The DTW path is: {pathMFCC}")
+    # score=distance_to_score(distanceAVG, 0.00000000150193575922916, 9.82746911958941)
+    # print(score)
+    # score=distance_to_score(distancePIT, 0.00000000150193575922916, 9.82746911958941)
+    # print(score)
+    # #return 100 / (1 + a * (dist ** b))
+    # # Assuming ave_mag_A_scaled, ave_mag_B_scaled, lin_pitch_A, lin_pitch_B, mfccs_A_cms, mfccs_B_cms are defined and populated with your data.
+    # distAVG, distPIT, distMFCC = calculate_distances(ave_mag_A_scaled, ave_mag_B_scaled, lin_pitch_A, lin_pitch_B, mfccs_A_cms, mfccs_B_cms)
+    # # Initial guess for optimization: [a1, b1, a2, b2, a3, b3, w1, w2, w3]
+    # #a b為距離轉成分數的參數,w為為三個特徵的權重
+    # #為了求得我們設計了以下實驗：首先我們先收集10句CNN互動英語的句字，當成標準語音，再請實驗室同學依此10句錄音，當成測試語音，總共收集了320句測試語音，每一句跟標準答案比
+    # initial_guess = [1, 1, 1, 1, 1, 1, 0.7, 0.2, 0.1]
+    # optimized_params = optimize_parameters(distAVG, distPIT, distMFCC, initial_guess)
+    # print("Optimized parameters:", optimized_params)
+    # total_score=scoring_function(optimized_params, distAVG, distPIT, distMFCC)
+    # print("Total score:", total_score)
 
 
     # # 預處理雜音
