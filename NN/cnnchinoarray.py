@@ -156,5 +156,5 @@ def main():
     predicted_class = predict_audio(test_file_path, model)
     print(f"Predicted Class: {predicted_class}")
 if __name__ == "__main__":
-    #print(len(tf.config.list_physical_devices('GPU')))
-    main()
+    print(tf.config.list_physical_devices('GPU'))
+    #main()
