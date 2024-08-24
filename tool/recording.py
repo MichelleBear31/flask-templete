@@ -32,5 +32,5 @@ def record_audio_to_file(filename, duration=1, channels=1, rate=44100, frames_pe
     return filename
 if __name__ == '__main__':
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    filename=os.path.join(current_dir, 'static','audio','user_input.wav')
+    filename=os.path.join(current_dir, 'static','audio','test2.wav')
     record_audio_to_file(filename)

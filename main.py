@@ -178,9 +178,12 @@ def End_pont_detection(y,sr):
     plt.legend(['Waveform', 'Boundaries by threshold 1', 'Boundaries by threshold 2'])
     plt.tight_layout()
     plt.show()
-def remove_silence(audio, threshold_low=30):
+def remove_silence(audio, threshold_low=1):
+    # 找到非靜音的範圍，並裁切靜音部分
     non_silent_intervals = librosa.effects.split(audio, top_db=threshold_low)
-    non_silent_audio = np.concatenate([audio[start:end] for start, end in non_silent_intervals])
+    start_sample, end_sample = non_silent_intervals[0][0], non_silent_intervals[-1][1]
+    non_silent_audio = audio[start_sample:end_sample]
+
     return non_silent_audio
 def Frame(y,sr):
     hop_length = 86#重疊部分

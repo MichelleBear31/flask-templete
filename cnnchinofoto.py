@@ -4,106 +4,220 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input, Concatenate
 from tensorflow.keras.optimizers import RMSprop
-from torch.nn import SELU
+from sklearn.decomposition import PCA
+import GPUtil
+
+# 选择第一个可用的 GPU（自动选择）
+available_gpus = GPUtil.getGPUs()
+if available_gpus:
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(0)
+    selected_gpu = available_gpus[0]
+    print(f"Using GPU ID: 0, Name: {selected_gpu.name}, Load: {selected_gpu.load*100:.1f}%, Memory Free: {selected_gpu.memoryFree}MB / {selected_gpu.memoryTotal}MB")
+else:
+    print("No GPU available. Running on CPU.")
 
 # 定義讀取影像的函數
 def read_images_from_folder(folder, img_size=(100, 100)):
     imgs, labels = [], []
-    for label in range(1, 4):  # 根據需求設置範圍
+    for label in range(1, 4):
         label_folder = os.path.join(folder, str(label))
         for filename in os.listdir(label_folder):
             if filename.endswith('.png'):
                 img_path = os.path.join(label_folder, filename)
-                img = cv2.imread(img_path, cv2.IMREAD_COLOR)  # 改為讀取彩色圖像
+                img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+                if img is None:
+                    print(f"Failed to load image: {img_path}")
+                    continue
                 img = cv2.resize(img, img_size)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)#轉灰色
                 imgs.append(img)
-                labels.append(label - 1)  # 將標籤從1-32轉為0-31
+                labels.append(label - 1)
     return np.array(imgs), np.array(labels)
+# 定義讀取單張圖片的函數
+def read_single_image(image_path, img_size=(100, 100)):
+    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError(f"Failed to load image from path: {image_path}")
+    img = cv2.resize(img, img_size)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return np.array(img)
+# 定義 SIFT 特徵提取器和 FLANN 匹配器
+sift = cv2.SIFT_create()
+flann = cv2.FlannBasedMatcher(dict(algorithm=0, trees=5), dict(checks=50))
+# 定義 RootSIFT 特徵提取函數
+def extract_rootsift_features(image, pca_model=None):
+    keypoints, descriptors = sift.detectAndCompute(image, None)
+    if descriptors is not None:
+        descriptors /= (descriptors.sum(axis=1, keepdims=True) + 1e-7)
+        descriptors = np.sqrt(descriptors)
+        if pca_model is not None:
+            descriptors = pca_model.transform(descriptors).flatten()
+        return keypoints, descriptors
+    return keypoints, np.zeros((128,))
+# 初始化并训练 PCA 模型
+def train_pca_on_descriptors(descriptor_list, n_components=64):
+    pca_model = PCA(n_components=n_components)
+    if len(descriptor_list) > 0:
+        stacked_descriptors = np.vstack(descriptor_list)
+        pca_model.fit(stacked_descriptors)
+    return pca_model
+# 提取特徵並填充
+def extract_features_with_padding(images, pca_model, expected_dim=128):
+    sift_features = []
+    for img in images:
+        _, feature = extract_rootsift_features(img.squeeze(-1), pca_model)
+        if feature.shape[0] < expected_dim:
+            feature = np.pad(feature, (0, expected_dim - feature.shape[0]), 'constant')
+        elif feature.shape[0] > expected_dim:
+            feature = feature[:expected_dim]
+        sift_features.append(feature)
+    return np.array(sift_features)
+# 構建卷積神經網絡模型
+def build_model():
+    input_img = Input(shape=(100, 100, 1))
+    cnn = Conv2D(128, kernel_size=(3, 3), activation='selu')(input_img)
+    cnn = MaxPooling2D(pool_size=(2, 2))(cnn)
+    cnn = Conv2D(256, kernel_size=(3, 3), activation='selu')(cnn)
+    cnn = MaxPooling2D(pool_size=(2, 2))(cnn)
+    cnn = Conv2D(512, kernel_size=(3, 3), activation='selu')(cnn)
+    cnn = MaxPooling2D(pool_size=(2, 2))(cnn)
+    cnn = Flatten()(cnn)
 
+    sift_features_input = Input(shape=(128,))
+    sift_flat = Dense(512, activation='selu')(sift_features_input)
+
+    merged = Concatenate()([cnn, sift_flat])
+    fc = Dense(1024, activation='selu')(merged)
+    fc = Dropout(0.5)(fc)
+    output = Dense(3, activation='softmax')(fc)
+
+    model = tf.keras.models.Model(inputs=[input_img, sift_features_input], outputs=output)
+    model.compile(optimizer=RMSprop(learning_rate=0.0001), loss='sparse_categorical_crossentropy', metrics=['sparse_categorical_accuracy'])
+    return model
+def compute_gradcam(model, img_array, sift_feature_array, last_conv_layer_name, pred_index=None):
+    grad_model = tf.keras.models.Model(
+        [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
+    )
+
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model([img_array, sift_feature_array])
+        if pred_index is None:
+            pred_index = tf.argmax(predictions[0])
+        class_channel = predictions[:, pred_index]
+
+    grads = tape.gradient(class_channel, conv_outputs)
+
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+    conv_outputs = conv_outputs[0]
+    heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+
+    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    heatmap = heatmap.numpy()
+
+    return heatmap
+
+def plot_gradcam(heatmap, image):
+    heatmap = cv2.resize(heatmap, (image.shape[1], image.shape[0]))
+    heatmap = np.uint8(255 * heatmap)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+
+    superimposed_img = cv2.addWeighted(image, 0.6, heatmap, 0.4, 0)
+    return superimposed_img
+
+def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2"):
+    heatmap = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
+    test_image_gray = test_image.squeeze(-1)
+    test_image_color = cv2.cvtColor(test_image_gray, cv2.COLOR_GRAY2RGB)
+
+    gradcam_image = plot_gradcam(heatmap, test_image_color)
+    
+    plt.figure(figsize=(10, 10))
+    plt.subplot(1, 2, 1)
+    plt.title("Original Image")
+    plt.imshow(test_image_color, cmap='gray')
+    plt.subplot(1, 2, 2)
+    plt.title("Grad-CAM")
+    plt.imshow(gradcam_image)
+    plt.show()
+
+# 讀取資料
 current_dir = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(current_dir, 'wave_fotoV2')
-model_weights_path = 'cnnwavefotoV2.h5'
+model_weights_path = 'cnnwavefotoV2_sift.weights.h5'
+train_model = input("Do you want to retrain the model? (y/n): ").strip().lower()
 
-# 檢查是否已經存在模型文件
-if os.path.exists(model_weights_path):
-    # 如果模型文件存在，手動構建模型架構
-    model = Sequential()
-    model.add(Conv2D(128, kernel_size=(3, 3), activation='selu', input_shape=(100, 100, 3)))  # 改為3通道輸入
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(256, kernel_size=(3, 3), activation='selu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(512, kernel_size=(3, 3), activation='selu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Flatten())
-    model.add(Dense(1024, activation='selu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(32, activation='softmax'))
+# 加载图像数据
+images, labels = read_images_from_folder(data_path)
+train_images, test_images, train_labels, test_labels = train_test_split(images, labels, test_size=0.3, random_state=42)
 
-    # 加載模型權重
-    model.load_weights(model_weights_path)
-    print("Loaded model weights from disk")
+# 重新塑形影像數據以適應卷積神經網絡的輸入格式
+train_images = train_images.reshape((train_images.shape[0], 100, 100, 1))
+test_images = test_images.reshape((test_images.shape[0], 100, 100, 1))
 
-    # 編譯模型
-    model.compile(optimizer=RMSprop(learning_rate=0.001), loss='sparse_categorical_crossentropy', metrics=['sparse_categorical_accuracy'])
-else:
-    # 從資料夾中讀取影像和標籤
-    images, labels = read_images_from_folder(data_path)
+# 提取并收集所有训练图像的 SIFT 描述符
+all_descriptors = []
+valid_indices = []
 
-    # 重新塑形影像數據以適應卷積神經網絡的輸入格式
-    images = images.reshape((images.shape[0], 100, 100, 3))  # 改為彩色圖像的形狀 (100, 100, 3)
+for idx, img in enumerate(train_images):
+    _, descriptors = extract_rootsift_features(img.squeeze(-1))
+    if descriptors is not None:
+        all_descriptors.append(descriptors)
+        valid_indices.append(idx)
+# 根据 valid_indices 重新筛选 train_images 和 train_labels
+train_images = train_images[valid_indices]
+train_labels = train_labels[valid_indices]
+# 训练 PCA 模型
+pca_model = train_pca_on_descriptors(all_descriptors, n_components=64)
 
-    # 分割數據集為訓練集和測試集，比例為7:3
-    train_images, test_images, train_labels, test_labels = train_test_split(images, labels, test_size=0.3, random_state=42)
+# 提取 RootSIFT 特徵並降維
+train_sift_features = extract_features_with_padding(train_images, pca_model)
+test_sift_features = extract_features_with_padding(test_images, pca_model)
 
-    # 打印數據集形狀以確認正確性
-    print(train_images.shape, train_labels.shape)
-    print(test_images.shape, test_labels.shape)
-
-    # 構建卷積神經網絡模型
-    model = Sequential()
-    model.add(Conv2D(128, kernel_size=(3, 3), activation='selu', input_shape=(100, 100, 3)))  # 改為3通道輸入
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(256, kernel_size=(3, 3), activation='selu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(512, kernel_size=(3, 3), activation='selu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Flatten())
-    model.add(Dense(1024, activation='selu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(32, activation='softmax'))
-
-    # 編譯模型
-    model.compile(optimizer=RMSprop(learning_rate=0.001), loss='sparse_categorical_crossentropy', metrics=['sparse_categorical_accuracy'])
-
+# 構建或加载模型
+model = build_model()
+if train_model == 'y':
     # 訓練模型
-    train_history = model.fit(train_images, train_labels, epochs=1000, batch_size=2048, validation_data=(test_images, test_labels))
+    train_history = model.fit([train_images, train_sift_features], train_labels, epochs=140, batch_size=16, validation_data=([test_images, test_sift_features], test_labels))
 
     # 保存模型權重
     model.save_weights(model_weights_path)
     print(f"Model weights saved to {model_weights_path}")
-
-    # 可視化訓練過程
-    plt.subplot(1, 2, 1)
-    plt.title("loss/epoch")
-    plt.xlabel("epoch")
-    plt.ylabel("loss")
-    plt.plot(train_history.epoch, train_history.history['loss'], linestyle="--", marker='o')
-    for a, b in zip(train_history.epoch, train_history.history['loss']):
-        plt.text(a, b + 0.1, round(b, 2), ha='center', va='bottom', fontsize=10)
-
-    # 可視化訓練準確度
-    plt.subplot(1, 2, 2)
-    plt.title("Train Accuracy / Epoch")
-    plt.xlabel("Epoch")
-    plt.ylabel("Train Accuracy")
-    plt.plot(train_history.epoch, train_history.history['sparse_categorical_accuracy'], linestyle="--", marker='o')
-    for a, b in zip(train_history.epoch, train_history.history['sparse_categorical_accuracy']):
-        plt.text(a, b + 0.003, round(b, 2), ha='center', va='bottom', fontsize=10)
-    plt.show()
+else:
+    # 加载已保存的權重
+    model.load_weights(model_weights_path)
+    print(f"Model weights loaded from {model_weights_path}")
 
 # 評估模型
-test_loss, test_acc = model.evaluate(test_images, test_labels)
+test_loss, test_acc = model.evaluate([test_images, test_sift_features], test_labels)
 print(f"Test accuracy: {test_acc:.2f}")
+# 測試單張音檔的圖片
+test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest2.png')
+test_image = read_single_image(test_image_path)
+
+# 提取和处理单张测试图片的 SIFT 特征
+_, test_sift_feature = extract_rootsift_features(test_image, pca_model)
+
+# 确保特征的长度为 128
+expected_dim = 128
+if test_sift_feature.shape[0] < expected_dim:
+    test_sift_feature = np.pad(test_sift_feature, (0, expected_dim - test_sift_feature.shape[0]), 'constant')
+elif test_sift_feature.shape[0] > expected_dim:
+    test_sift_feature = test_sift_feature[:expected_dim]
+
+# 调整形状为 (1, 128)
+test_sift_feature = test_sift_feature.reshape(1, -1)
+
+# 预测结果
+predictions = model.predict([test_image.reshape((1, 100, 100, 1)), test_sift_feature])
+predicted_class = np.argmax(predictions)
+
+# 输出预测结果
+print(f"Predicted folder (class): {predicted_class + 1}")  # +1 使结果与资料夹号对应
+print(f"Prediction confidence: {np.max(predictions) * 100:.2f}%")
+
+# 显示 Grad-CAM 可视化
+display_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2")
