@@ -24,7 +24,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(current_dir, 'wave_fotoV2')
 model_weights_path = 'cnnwavefotoV2_sift.weights.h5'
 # 測試單張音檔的圖片
-test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest2.png')
+test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest3.png')
 # 定義讀取影像的函數
 def read_images_from_folder(folder, img_size=(100, 100)):
     imgs, labels = [], []
@@ -54,27 +54,18 @@ def read_single_image(image_path, img_size=(100, 100)):
 sift = cv2.SIFT_create()
 flann = cv2.FlannBasedMatcher(dict(algorithm=0, trees=5), dict(checks=50))
 # 定義 RootSIFT 特徵提取函數
-def extract_rootsift_features(image, pca_model=None):
+def extract_rootsift_features(image):
     keypoints, descriptors = sift.detectAndCompute(image, None)
     if descriptors is not None:
         descriptors /= (descriptors.sum(axis=1, keepdims=True) + 1e-7)
         descriptors = np.sqrt(descriptors)
-        if pca_model is not None:
-            descriptors = pca_model.transform(descriptors).flatten()
-        return keypoints, descriptors
+        return keypoints, descriptors.flatten()  # 直接保留完整特徵並扁平化
     return keypoints, np.zeros((128,))
-# 初始化并训练 PCA 模型
-def train_pca_on_descriptors(descriptor_list, n_components=64):
-    pca_model = PCA(n_components=n_components)
-    if len(descriptor_list) > 0:
-        stacked_descriptors = np.vstack(descriptor_list)
-        pca_model.fit(stacked_descriptors)
-    return pca_model
 # 提取特徵並填充
-def extract_features_with_padding(images, pca_model, expected_dim=128):
+def extract_features_with_padding(images, expected_dim=128):
     sift_features = []
     for img in images:
-        _, feature = extract_rootsift_features(img.squeeze(-1), pca_model)
+        _, feature = extract_rootsift_features(img.squeeze(-1))
         if feature.shape[0] < expected_dim:
             feature = np.pad(feature, (0, expected_dim - feature.shape[0]), 'constant')
         elif feature.shape[0] > expected_dim:
@@ -163,7 +154,16 @@ def display_and_save_gradcam(model, test_image, test_sift_feature, last_conv_lay
     # 保存图像
     # plt.savefig(output_path)
     # plt.show()
+def visualize_layer_activations(model, test_image, test_sift_feature):
+    layer_outputs = [layer.output for layer in model.layers[:6]]  # 选择前几层
+    activation_model = tf.keras.models.Model(inputs=model.input, outputs=layer_outputs)
+    activations = activation_model.predict([test_image, test_sift_feature])
 
+    for i, activation in enumerate(activations):
+        plt.figure(figsize=(15, 15))
+        plt.imshow(activation[0, :, :, 0], cmap='viridis')  # 显示第一张激活图
+        plt.title(f"Activation Layer {i+1}")
+        plt.show()
 def plot_pca_features(features, labels, original_image):
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
@@ -192,7 +192,7 @@ def plot_tsne_features(features, labels, original_image):
     plt.ylabel('t-SNE Component 2')
     plt.show()
 
-# 使用Grad-CAM进行可视化
+# 使用Grad-CAM圖形輸出可視化模型判斷類別過程
 def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2"):
     gradcam = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
     test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
@@ -216,6 +216,8 @@ def visualize_all(features, labels, model, test_image, test_sift_feature):
     # Grad-CAM可视化
     display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2")
 
+    #可视化中间层的激活图
+    visualize_layer_activations(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature)
 train_model = input("Do you want to retrain the model? (y/n): ").strip().lower()
 
 # 加载图像数据
@@ -226,24 +228,9 @@ train_images, test_images, train_labels, test_labels = train_test_split(images, 
 train_images = train_images.reshape((train_images.shape[0], 100, 100, 1))
 test_images = test_images.reshape((test_images.shape[0], 100, 100, 1))
 
-# 提取并收集所有训练图像的 SIFT 描述符
-all_descriptors = []
-valid_indices = []
-
-for idx, img in enumerate(train_images):
-    _, descriptors = extract_rootsift_features(img.squeeze(-1))
-    if descriptors is not None:
-        all_descriptors.append(descriptors)
-        valid_indices.append(idx)
-# 根据 valid_indices 重新筛选 train_images 和 train_labels
-train_images = train_images[valid_indices]
-train_labels = train_labels[valid_indices]
-# 训练 PCA 模型
-pca_model = train_pca_on_descriptors(all_descriptors, n_components=64)
-
-# 提取 RootSIFT 特徵並降維
-train_sift_features = extract_features_with_padding(train_images, pca_model)
-test_sift_features = extract_features_with_padding(test_images, pca_model)
+# 提取並收集所有训练图像的 SIFT 描述符
+train_sift_features = extract_features_with_padding(train_images)
+test_sift_features = extract_features_with_padding(test_images)
 
 # 構建或加载模型
 model = build_model()
@@ -265,7 +252,7 @@ print(f"Test accuracy: {test_acc:.2f}")
 test_image = read_single_image(test_image_path)
 
 # 提取和处理单张测试图片的 SIFT 特征
-_, test_sift_feature = extract_rootsift_features(test_image, pca_model)
+_, test_sift_feature = extract_rootsift_features(test_image)
 
 # 确保特征的长度为 128
 expected_dim = 128
@@ -285,10 +272,10 @@ predicted_class = np.argmax(predictions)
 print(f"Predicted folder (class): {predicted_class + 1}")  # +1 使结果与资料夹号对应
 print(f"Prediction confidence: {np.max(predictions) * 100:.2f}%")
 
-# # 进行PCA和t-SNE可视化
+# 进行PCA和t-SNE可视化
 # plot_pca_features(train_sift_features, train_labels,test_image)
 # plot_tsne_features(train_sift_features, train_labels,test_image)
 
-# 生成并保存 Grad-CAM 可视化结果
-# display_and_save_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2", output_path="gradcam_output.png")
+# 生成并保存 Grad-CAM 圖形輸出可視化模型判斷類別過程
+display_and_save_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2", output_path="gradcam_output.png")
 visualize_all(train_sift_features, train_labels, model, test_image.reshape((1, 100, 100, 1)), test_sift_feature)

@@ -29,15 +29,15 @@ for folder_num in range(1, 4):
             # 讀取音檔
             y, sr = librosa.load(file_path, sr=None)
 
-            # 找到前後靜音部分並去除
-            non_silent_intervals = librosa.effects.split(y, top_db=10)
-            start_sample, end_sample = non_silent_intervals[0][0], non_silent_intervals[-1][1]
-            non_silent_audio = y[start_sample:end_sample]
+            # # 找到前後靜音部分並去除
+            # non_silent_intervals = librosa.effects.split(y, top_db=80)
+            # start_sample, end_sample = non_silent_intervals[0][0], non_silent_intervals[-1][1]
+            # non_silent_audio = y[start_sample:end_sample]
 
             # 繪製波形圖
             plt.figure(figsize=(1, 1), dpi=100)  # 設定圖片大小為 100x100 像素
             plt.axis('off')  # 去除座標軸
-            librosa.display.waveshow(non_silent_audio, sr=sr)
+            librosa.display.waveshow(y, sr=sr)
             plt.subplots_adjust(left=0, right=1, top=1, bottom=0)  # 去除邊框
 
             # 儲存圖片
