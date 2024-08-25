@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Input, Concatenate
 from tensorflow.keras.optimizers import RMSprop
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 import GPUtil
 
 # 选择第一个可用的 GPU（自动选择）
@@ -18,6 +19,12 @@ if available_gpus:
 else:
     print("No GPU available. Running on CPU.")
 
+# 讀取資料
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.join(current_dir, 'wave_fotoV2')
+model_weights_path = 'cnnwavefotoV2_sift.weights.h5'
+# 測試單張音檔的圖片
+test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest1.png')
 # 定義讀取影像的函數
 def read_images_from_folder(folder, img_size=(100, 100)):
     imgs, labels = [], []
@@ -142,24 +149,86 @@ def plot_gradcam(gradcam, image):
     superimposed_img = np.uint8(superimposed_img)
 
     return superimposed_img
-def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2"):
+def display_and_save_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2", output_path="gradcam_output.png"):
     gradcam = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
     test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
     gradcam_image = plot_gradcam(gradcam, test_image_gray)
 
     plt.figure(figsize=(10, 10))
-    plt.subplot(1, 2, 1)
+    plt.subplot(1,2,1)
     plt.title("Original Image")
     plt.imshow(test_image_gray, cmap='gray')
-    plt.subplot(1, 2, 2)
-    plt.title("Grad-CAM")
-    plt.imshow(gradcam_image, cmap='gray')
+    # plt.subplot(1, 2, 2)
+    # plt.title("Grad-CAM")
+    # plt.imshow(gradcam_image, cmap='gray')
+
+    # 保存图像
+    plt.savefig(output_path)
     plt.show()
 
-# 讀取資料
-current_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(current_dir, 'wave_fotoV2')
-model_weights_path = 'cnnwavefotoV2_sift.weights.h5'
+def plot_pca_features(features, labels, original_image):
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+    
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
+    plt.colorbar()
+    plt.title('PCA of Features')
+    plt.xlabel('Principal Component 1')
+    plt.ylabel('Principal Component 2')
+    
+    plt.subplot(1, 2, 2)
+    plt.title('Original Image')
+    plt.imshow(original_image, cmap='gray')
+    plt.show()
+
+# 使用t-SNE进行特征可视化
+def plot_tsne_features(features, labels, original_image):
+    tsne = TSNE(n_components=2, random_state=42)
+    reduced_features = tsne.fit_transform(features)
+    
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.6)
+    plt.colorbar()
+    plt.title('t-SNE 2D Visualization of Features')
+    plt.xlabel('t-SNE Component 1')
+    plt.ylabel('t-SNE Component 2')
+    
+    plt.subplot(1, 2, 2)
+    plt.title('Original Image')
+    plt.imshow(original_image, cmap='gray')
+    plt.show()
+
+# 使用Grad-CAM进行可视化
+def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2"):
+    gradcam = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
+    test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
+    gradcam_image = plot_gradcam(gradcam, test_image_gray)
+
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.title("Grad-CAM")
+    plt.imshow(gradcam_image, cmap='gray')
+    
+    plt.subplot(1, 2, 2)
+    plt.title("Original Image")
+    plt.imshow(test_image_gray, cmap='gray')
+    plt.show()
+# 在测试图像上应用PCA、t-SNE、Grad-CAM，并显示结果
+def visualize_all(features, labels, model, test_image, test_sift_feature):
+    test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
+    
+    # PCA可视化
+    plot_pca_features(features, labels, test_image_gray)
+    
+    # t-SNE可视化
+    plot_tsne_features(features, labels, test_image_gray)
+    
+    # Grad-CAM可视化
+    display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2")
+
 train_model = input("Do you want to retrain the model? (y/n): ").strip().lower()
 
 # 加载图像数据
@@ -206,8 +275,6 @@ else:
 # 評估模型
 test_loss, test_acc = model.evaluate([test_images, test_sift_features], test_labels)
 print(f"Test accuracy: {test_acc:.2f}")
-# 測試單張音檔的圖片
-test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest1.png')
 test_image = read_single_image(test_image_path)
 
 # 提取和处理单张测试图片的 SIFT 特征
@@ -231,5 +298,10 @@ predicted_class = np.argmax(predictions)
 print(f"Predicted folder (class): {predicted_class + 1}")  # +1 使结果与资料夹号对应
 print(f"Prediction confidence: {np.max(predictions) * 100:.2f}%")
 
-# 显示 Grad-CAM 可视化
-display_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2")
+# # 进行PCA和t-SNE可视化
+# plot_pca_features(train_sift_features, train_labels,test_image)
+# plot_tsne_features(train_sift_features, train_labels,test_image)
+
+# 生成并保存 Grad-CAM 可视化结果
+display_and_save_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2", output_path="gradcam_output.png")
+visualize_all(train_sift_features, train_labels, model, test_image.reshape((1, 100, 100, 1)), test_sift_feature)
