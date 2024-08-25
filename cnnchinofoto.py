@@ -120,28 +120,40 @@ def compute_gradcam(model, img_array, sift_feature_array, last_conv_layer_name, 
 
     return heatmap
 
-def plot_gradcam(heatmap, image):
-    heatmap = cv2.resize(heatmap, (image.shape[1], image.shape[0]))
-    heatmap = np.uint8(255 * heatmap)
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+def plot_gradcam(gradcam, image):
+    # 调整 gradcam 大小以匹配图像大小
+    gradcam = cv2.resize(gradcam, (image.shape[1], image.shape[0]))
 
-    superimposed_img = cv2.addWeighted(image, 0.6, heatmap, 0.4, 0)
+    # 将 gradcam 和 image 都转换为 float64 类型
+    gradcam = gradcam.astype(np.float64)
+    image = image.astype(np.float64)
+
+    # 将 gradcam 归一化到 0-255 范围
+    if np.max(gradcam) != 0:  # 防止除以0的错误
+        gradcam = gradcam * 255.0 / np.max(gradcam)
+
+    print(f"Image shape: {image.shape}, dtype: {image.dtype}")
+    print(f"Grad-CAM shape: {gradcam.shape}, dtype: {gradcam.dtype}")
+
+    # 将 gradcam 与原始图像叠加
+    superimposed_img = cv2.addWeighted(image, 0.6, gradcam, 0.4, 0)
+
+    # 将结果转换为 uint8 类型
+    superimposed_img = np.uint8(superimposed_img)
+
     return superimposed_img
-
 def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="conv2d_2"):
-    heatmap = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
-    test_image_gray = test_image.squeeze(-1)
-    test_image_color = cv2.cvtColor(test_image_gray, cv2.COLOR_GRAY2RGB)
+    gradcam = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
+    test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
+    gradcam_image = plot_gradcam(gradcam, test_image_gray)
 
-    gradcam_image = plot_gradcam(heatmap, test_image_color)
-    
     plt.figure(figsize=(10, 10))
     plt.subplot(1, 2, 1)
     plt.title("Original Image")
-    plt.imshow(test_image_color, cmap='gray')
+    plt.imshow(test_image_gray, cmap='gray')
     plt.subplot(1, 2, 2)
     plt.title("Grad-CAM")
-    plt.imshow(gradcam_image)
+    plt.imshow(gradcam_image, cmap='gray')
     plt.show()
 
 # 讀取資料
@@ -181,7 +193,7 @@ test_sift_features = extract_features_with_padding(test_images, pca_model)
 model = build_model()
 if train_model == 'y':
     # 訓練模型
-    train_history = model.fit([train_images, train_sift_features], train_labels, epochs=140, batch_size=16, validation_data=([test_images, test_sift_features], test_labels))
+    train_history = model.fit([train_images, train_sift_features], train_labels, epochs=130, batch_size=16, validation_data=([test_images, test_sift_features], test_labels))
 
     # 保存模型權重
     model.save_weights(model_weights_path)
@@ -195,7 +207,7 @@ else:
 test_loss, test_acc = model.evaluate([test_images, test_sift_features], test_labels)
 print(f"Test accuracy: {test_acc:.2f}")
 # 測試單張音檔的圖片
-test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest2.png')
+test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest1.png')
 test_image = read_single_image(test_image_path)
 
 # 提取和处理单张测试图片的 SIFT 特征
