@@ -24,7 +24,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(current_dir, 'wave_fotoV2')
 model_weights_path = 'cnnwavefotoV2_sift.weights.h5'
 # 測試單張音檔的圖片
-test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest1.png')
+test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest2.png')
 # 定義讀取影像的函數
 def read_images_from_folder(folder, img_size=(100, 100)):
     imgs, labels = [], []
@@ -153,34 +153,28 @@ def display_and_save_gradcam(model, test_image, test_sift_feature, last_conv_lay
     gradcam = compute_gradcam(model, test_image, test_sift_feature, last_conv_layer_name)
     test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
     gradcam_image = plot_gradcam(gradcam, test_image_gray)
-
     # plt.figure(figsize=(10, 10))
     # plt.subplot(1,2,1)
     # plt.title("Original Image")
     # plt.imshow(test_image_gray, cmap='gray')
-    # # plt.subplot(1, 2, 2)
-    # # plt.title("Grad-CAM")
-    # # plt.imshow(gradcam_image, cmap='gray')
-
-    # # 保存图像
+    # plt.subplot(1, 2, 2)
+    # plt.title("Grad-CAM")
+    # plt.imshow(gradcam_image, cmap='gray')
+    # 保存图像
     # plt.savefig(output_path)
     # plt.show()
 
 def plot_pca_features(features, labels, original_image):
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
-    
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
+    plt.figure(figsize=(30, 30))
+    plt.imshow(original_image, cmap='gray', extent=[reduced_features[:, 0].min(), reduced_features[:, 0].max(),
+                                                    reduced_features[:, 1].min(), reduced_features[:, 1].max()])
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.6)
     plt.colorbar()
-    plt.title('PCA of Features')
+    plt.title('PCA of Features with Original Image Overlay')
     plt.xlabel('Principal Component 1')
     plt.ylabel('Principal Component 2')
-    
-    plt.subplot(1, 2, 2)
-    plt.title('Original Image')
-    plt.imshow(original_image, cmap='gray')
     plt.show()
 
 # 使用t-SNE进行特征可视化
@@ -188,17 +182,14 @@ def plot_tsne_features(features, labels, original_image):
     tsne = TSNE(n_components=2, random_state=42)
     reduced_features = tsne.fit_transform(features)
     
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
+    plt.figure(figsize=(10, 20))
+    plt.imshow(original_image, cmap='gray', extent=[reduced_features[:, 0].min(), reduced_features[:, 0].max(),
+                                                    reduced_features[:, 1].min(), reduced_features[:, 1].max()])
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.6)
     plt.colorbar()
-    plt.title('t-SNE 2D Visualization of Features')
+    plt.title('t-SNE of Features with Original Image Overlay')
     plt.xlabel('t-SNE Component 1')
     plt.ylabel('t-SNE Component 2')
-    
-    plt.subplot(1, 2, 2)
-    plt.title('Original Image')
-    plt.imshow(original_image, cmap='gray')
     plt.show()
 
 # 使用Grad-CAM进行可视化
@@ -207,14 +198,10 @@ def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="
     test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
     gradcam_image = plot_gradcam(gradcam, test_image_gray)
 
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.title("Grad-CAM")
-    plt.imshow(gradcam_image, cmap='gray')
-    
-    # plt.subplot(1, 2, 2)
-    # plt.title("Original Image")
-    # plt.imshow(test_image_gray, cmap='gray')
+    plt.figure(figsize=(12, 12))
+    plt.imshow(test_image_gray, cmap='gray')
+    plt.imshow(gradcam_image, cmap='jet', alpha=0.5)  # 使用 alpha 参数进行叠加
+    plt.title("Grad-CAM with Original Image Overlay")
     plt.show()
 # 在测试图像上应用PCA、t-SNE、Grad-CAM，并显示结果
 def visualize_all(features, labels, model, test_image, test_sift_feature):
