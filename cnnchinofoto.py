@@ -154,17 +154,17 @@ def display_and_save_gradcam(model, test_image, test_sift_feature, last_conv_lay
     test_image_gray = test_image.squeeze(0).squeeze(-1)  # 确保图像是二维的 (100, 100)
     gradcam_image = plot_gradcam(gradcam, test_image_gray)
 
-    plt.figure(figsize=(10, 10))
-    plt.subplot(1,2,1)
-    plt.title("Original Image")
-    plt.imshow(test_image_gray, cmap='gray')
-    # plt.subplot(1, 2, 2)
-    # plt.title("Grad-CAM")
-    # plt.imshow(gradcam_image, cmap='gray')
+    # plt.figure(figsize=(10, 10))
+    # plt.subplot(1,2,1)
+    # plt.title("Original Image")
+    # plt.imshow(test_image_gray, cmap='gray')
+    # # plt.subplot(1, 2, 2)
+    # # plt.title("Grad-CAM")
+    # # plt.imshow(gradcam_image, cmap='gray')
 
-    # 保存图像
-    plt.savefig(output_path)
-    plt.show()
+    # # 保存图像
+    # plt.savefig(output_path)
+    # plt.show()
 
 def plot_pca_features(features, labels, original_image):
     pca = PCA(n_components=2)
@@ -212,9 +212,9 @@ def display_gradcam(model, test_image, test_sift_feature, last_conv_layer_name="
     plt.title("Grad-CAM")
     plt.imshow(gradcam_image, cmap='gray')
     
-    plt.subplot(1, 2, 2)
-    plt.title("Original Image")
-    plt.imshow(test_image_gray, cmap='gray')
+    # plt.subplot(1, 2, 2)
+    # plt.title("Original Image")
+    # plt.imshow(test_image_gray, cmap='gray')
     plt.show()
 # 在测试图像上应用PCA、t-SNE、Grad-CAM，并显示结果
 def visualize_all(features, labels, model, test_image, test_sift_feature):
@@ -303,5 +303,5 @@ print(f"Prediction confidence: {np.max(predictions) * 100:.2f}%")
 # plot_tsne_features(train_sift_features, train_labels,test_image)
 
 # 生成并保存 Grad-CAM 可视化结果
-display_and_save_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2", output_path="gradcam_output.png")
+# display_and_save_gradcam(model, test_image.reshape((1, 100, 100, 1)), test_sift_feature, last_conv_layer_name="conv2d_2", output_path="gradcam_output.png")
 visualize_all(train_sift_features, train_labels, model, test_image.reshape((1, 100, 100, 1)), test_sift_feature)
