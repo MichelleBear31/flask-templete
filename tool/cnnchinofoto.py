@@ -21,7 +21,7 @@ else:
 
 # 讀取資料
 current_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(current_dir, 'wave_fotoV2')
+data_path = os.path.join(current_dir, 'wave_fotoV1')
 model_weights_path = 'cnnwavefotoV2_sift.weights.h5'
 # 測試單張音檔的圖片
 test_image_path = os.path.join(current_dir, 'static', 'audio', 'Fototest', 'Fototest1.png')
